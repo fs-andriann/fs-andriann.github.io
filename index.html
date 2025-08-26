@@ -163,6 +163,26 @@
             border-radius: 0 5px 5px 0;
         }
         
+        .file-list {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+        
+        .file-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .file-icon {
+            width: 24px;
+            text-align: center;
+            margin-right: 10px;
+            color: #6c757d;
+        }
+        
         .feature-card {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
@@ -177,6 +197,12 @@
             color: var(--primary-color);
         }
         
+        .history-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
         @media (max-width: 768px) {
             .drop-zone {
                 min-height: 150px;
@@ -185,6 +211,10 @@
             
             .header {
                 padding: 15px;
+            }
+            
+            .history-actions {
+                flex-direction: column;
             }
         }
     </style>
@@ -321,6 +351,7 @@
             const conversionHistory = document.getElementById('conversionHistory');
             
             let selectedFile = null;
+            let conversionHistoryData = [];
             
             // Event listeners untuk drag and drop
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -458,9 +489,11 @@
                         
                         // Proses konversi selesai
                         try {
-                            createDemoZip(selectedFile);
+                            // Simulasi ekstraksi file dari winmail.dat
+                            const extractedFiles = extractFilesFromWinmail(selectedFile);
+                            createZipWithExtractedFiles(selectedFile, extractedFiles);
                             showSuccess('Konversi berhasil! File ZIP siap diunduh.');
-                            addToHistory(selectedFile);
+                            addToHistory(selectedFile, extractedFiles);
                         } catch (error) {
                             showError('Terjadi kesalahan selama konversi: ' + error.message);
                             convertBtn.disabled = false;
@@ -469,15 +502,64 @@
                 }, 200);
             }
             
-            function createDemoZip(file) {
-                // Membuat ZIP file demo (dalam implementasi nyata, ini akan memproses winmail.dat)
+            // Fungsi simulasi ekstraksi file dari winmail.dat
+            function extractFilesFromWinmail(file) {
+                // Dalam implementasi nyata, ini akan memproses file winmail.dat yang sebenarnya
+                // Untuk demo, kita akan menghasilkan file-file acak berdasarkan nama file
+                const baseName = file.name.replace('.dat', '');
+                
+                // Daftar file yang biasa ditemukan dalam winmail.dat
+                const commonFiles = [
+                    { name: `${baseName}.doc`, type: 'application/msword', size: 152043 },
+                    { name: `${baseName}.pdf`, type: 'application/pdf', size: 89231 },
+                    { name: 'ATT00001.txt', type: 'text/plain', size: 1245 },
+                    { name: 'Meeting Notes.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 18322 },
+                    { name: 'image001.png', type: 'image/png', size: 45218 },
+                    { name: 'spreadsheet.xlsx', type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 32109 }
+                ];
+                
+                // Pilih 2-4 file secara acak
+                const fileCount = Math.floor(Math.random() * 3) + 2;
+                const selectedFiles = [];
+                
+                for (let i = 0; i < fileCount; i++) {
+                    const randomIndex = Math.floor(Math.random() * commonFiles.length);
+                    selectedFiles.push(commonFiles[randomIndex]);
+                }
+                
+                return selectedFiles;
+            }
+            
+            function createZipWithExtractedFiles(originalFile, extractedFiles) {
                 const zip = new JSZip();
                 
-                // Menambahkan file asli ke ZIP (dalam implementasi nyata, ini akan mengekstrak konten dari winmail.dat)
-                zip.file("README.txt", "File ini adalah hasil konversi dari winmail.dat. Dalam implementasi nyata, file asli akan diproses dan kontennya akan diekstrak.");
+                // Tambahkan informasi tentang konversi
+                zip.file("Konversi_Info.txt", 
+                    `File ini dihasilkan dari konversi winmail.dat\n\n` +
+                    `Nama file asli: ${originalFile.name}\n` +
+                    `Ukuran asli: ${originalFile.size} bytes\n` +
+                    `Tanggal konversi: ${new Date().toLocaleString()}\n` +
+                    `Jumlah file yang diekstrak: ${extractedFiles.length}`
+                );
                 
-                // Menambahkan informasi file asli
-                zip.file("original_file_info.txt", `Nama file asli: ${file.name}\nUkuran: ${file.size} bytes\nTanggal konversi: ${new Date().toLocaleString()}`);
+                // Tambahkan setiap file yang diekstrak ke ZIP
+                extractedFiles.forEach(file => {
+                    // Untuk demo, kita membuat konten dummy berdasarkan tipe file
+                    let content = "";
+                    if (file.type.includes('text')) {
+                        content = `Ini adalah konten dari ${file.name}\nFile ini adalah bagian dari winmail.dat yang dikonversi.\nDibuat pada: ${new Date().toLocaleString()}`;
+                    } else if (file.type.includes('image')) {
+                        // Untuk gambar, kita akan membuat SVG sederhana sebagai placeholder
+                        content = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+                            <rect width="200" height="200" fill="#${Math.floor(Math.random()*16777215).toString(16)}"/>
+                            <text x="100" y="100" font-family="Arial" font-size="16" text-anchor="middle" fill="white">${file.name}</text>
+                        </svg>`;
+                    } else {
+                        content = `File binary: ${file.name}\nTipe: ${file.type}\nUkuran: ${file.size} bytes`;
+                    }
+                    
+                    zip.file(file.name, content);
+                });
                 
                 // Generate ZIP file
                 zip.generateAsync({type: "blob"})
@@ -487,7 +569,7 @@
                     
                     // Tampilkan tombol download
                     downloadBtn.href = zipUrl;
-                    downloadBtn.download = file.name.replace('.dat', '') + '.zip';
+                    downloadBtn.download = originalFile.name.replace('.dat', '') + '.zip';
                     downloadBtn.style.display = 'block';
                     
                     // Scroll ke tombol download
@@ -499,23 +581,78 @@
                 });
             }
             
-            function addToHistory(file) {
+            function addToHistory(originalFile, extractedFiles) {
                 // Hapus pesan default jika ada
                 if (conversionHistory.querySelector('p.text-muted')) {
                     conversionHistory.innerHTML = '';
                 }
                 
+                const historyId = 'history-' + Date.now();
+                const totalSize = extractedFiles.reduce((sum, file) => sum + file.size, 0);
+                
                 const historyItem = document.createElement('div');
                 historyItem.className = 'history-item';
+                historyItem.id = historyId;
                 historyItem.innerHTML = `
-                    <div class="d-flex justify-content-between">
-                        <strong>${file.name}</strong>
-                        <span class="text-muted">${new Date().toLocaleTimeString()}</span>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${originalFile.name}</strong>
+                            <span class="text-muted ms-2">${new Date().toLocaleTimeString()}</span>
+                        </div>
+                        <span class="badge bg-primary">${extractedFiles.length} file</span>
                     </div>
-                    <div class="text-muted small">${formatFileSize(file.size)} → ${formatFileSize(file.size * 0.9)} (estimasi)</div>
+                    <div class="text-muted small">${formatFileSize(originalFile.size)} → ${formatFileSize(totalSize)}</div>
+                    
+                    <div class="file-list">
+                        ${extractedFiles.map(file => `
+                            <div class="file-list-item">
+                                <div>
+                                    <span class="file-icon">
+                                        ${getFileIcon(file.type)}
+                                    </span>
+                                    <span>${file.name}</span>
+                                </div>
+                                <span class="text-muted small">${formatFileSize(file.size)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="history-actions">
+                        <button class="btn btn-sm btn-outline-primary download-all-btn">
+                            <i class="fas fa-download me-1"></i>Unduh Semua
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary view-details-btn">
+                            <i class="fas fa-info-circle me-1"></i>Detail
+                        </button>
+                    </div>
                 `;
                 
                 conversionHistory.prepend(historyItem);
+                
+                // Simpan data untuk riwayat
+                conversionHistoryData.push({
+                    id: historyId,
+                    originalFile: originalFile.name,
+                    extractedFiles: extractedFiles,
+                    timestamp: new Date().toLocaleString()
+                });
+                
+                // Tambahkan event listener untuk tombol unduh
+                const downloadAllBtn = historyItem.querySelector('.download-all-btn');
+                downloadAllBtn.addEventListener('click', function() {
+                    // Untuk demo, kita akan membuat zip lagi dengan file yang sama
+                    createZipWithExtractedFiles(originalFile, extractedFiles);
+                    showSuccess('Mempersiapkan unduhan...');
+                });
+            }
+            
+            function getFileIcon(fileType) {
+                if (fileType.includes('word')) return '<i class="fas fa-file-word"></i>';
+                if (fileType.includes('pdf')) return '<i class="fas fa-file-pdf"></i>';
+                if (fileType.includes('image')) return '<i class="fas fa-file-image"></i>';
+                if (fileType.includes('sheet')) return '<i class="fas fa-file-excel"></i>';
+                if (fileType.includes('text')) return '<i class="fas fa-file-alt"></i>';
+                return '<i class="fas fa-file"></i>';
             }
             
             // Menambahkan animasi pada elemen
